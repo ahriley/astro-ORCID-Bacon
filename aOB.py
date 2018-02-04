@@ -13,7 +13,7 @@ curr = os.getcwd()
 
 # token should be stored locally, per ads pkg docs
 
-def find_all_ORCID_papers_in_ADS(verbose=False):
+def find_all_ORCID_papers_in_ADS(save=True,verbose=False):
     """
     Extract all papers that have an ORCID ID specified in any of the three ORCID fields (orcid_pub, orcid_user,
     orcid_other). Combines the lists, following the priority order, and outputs to a file.
@@ -70,9 +70,13 @@ def find_all_ORCID_papers_in_ADS(verbose=False):
             print(j)
 
     all_astro_orcid_papers = np.asarray(allpapers)
-    np.save('all_astro_orcid_papers.npy', all_astro_orcid_papers)
 
-def build_ORCID_network(path=curr,verbose=False):
+    if save:
+        np.save('all_astro_orcid_papers.npy', all_astro_orcid_papers)
+
+    return all_astro_orcid_papers
+
+def build_ORCID_network(path=curr,orcid_data=None,save=True,output_gexf=True,verbose=False):
     """
     Takes output file from find_all_ORCID_papers_in_ADS and converts it to a network, using the ORCID IDs
     as nodes and the bibcodes as edges.
@@ -80,7 +84,8 @@ def build_ORCID_network(path=curr,verbose=False):
     :param path: path to where output file from find_all_ORCID_papers_in_ADS is stored
     :return: None; outputs graph to file
     """
-    orcid_data = np.load(path + '/' + 'all_astro_orcid_papers.npy')
+    if orcid_data is None:
+        orcid_data = np.load(path + '/' + 'all_astro_orcid_papers.npy')
 
     # get the nodes (unique ORCID IDs)
     bfl = []
@@ -113,13 +118,17 @@ def build_ORCID_network(path=curr,verbose=False):
                     if author2 not in G[author1]:
                         G.add_edge(author1, author2)
 
-    with open('ORCID_graph.pkl', 'wb') as f:
-        pickle.dump(G, f)
+    if save:
+        with open('ORCID_graph.pkl', 'wb') as f:
+            pickle.dump(G, f)
 
-    # format for working with Gephi visualization
-    nx.write_gexf(G, 'ORCID_graph.gexf')
+    if output_gexf:
+        # format for working with Gephi visualization
+        nx.write_gexf(G, 'ORCID_graph.gexf')
 
-def calc_centrality(path=curr,verbose=False):
+    return G
+
+def calc_centrality(path=curr,G=None,save=True,verbose=False):
     """
     Calculates the centrality of every node in the graph; returns a sorted list as a file.
 
@@ -128,8 +137,9 @@ def calc_centrality(path=curr,verbose=False):
     :param path: path to where the output graph file is stored
     :return: None; writes file of nodes and centrality scores, sorted by centrality
     """
-    with open(path + '/' + 'ORCID_graph.pkl', 'rb') as f:
-        G = pickle.load(f)
+    if G is None:
+        with open(path + '/' + 'ORCID_graph.pkl', 'rb') as f:
+            G = pickle.load(f)
 
     clcent = nx.closeness_centrality(G)
 
@@ -141,11 +151,14 @@ def calc_centrality(path=curr,verbose=False):
         print(sort_orcids)
         print(sort_central)
 
-    with open('centrality.csv', 'w') as f:
-        writer = csv.writer(f, delimiter='\t')
-        writer.writerows(zip(sort_orcids,sort_central))
+    if save:
+        with open('centrality.csv', 'w') as f:
+            writer = csv.writer(f, delimiter='\t')
+            writer.writerows(zip(sort_orcids,sort_central))
 
-def calc_path_2_ORCIDs(path=curr,node1=None,node2=None):
+    return sort_orcids, sort_central
+
+def calc_path_2_ORCIDs(path=curr,G=None,node1=None,node2=None):
     """
     Calculates shortest path between two nodes (ORCID IDs). Returns path + degrees.
 
@@ -155,9 +168,9 @@ def calc_path_2_ORCIDs(path=curr,node1=None,node2=None):
     :param node2: second node; defaults to second most central node
     :return: shortest path + degrees (len(shortest path) - 1)
     """
-
-    with open(path + '/' + 'ORCID_graph.pkl', 'rb') as f:
-        G = pickle.load(f)
+    if G is None:
+        with open(path + '/' + 'ORCID_graph.pkl', 'rb') as f:
+            G = pickle.load(f)
 
     if (node1 is None) or (node2 is None):
         with open(path + '/' + 'centrality.csv', 'rb') as f:
@@ -186,7 +199,9 @@ def calc_path_2_ORCIDs(path=curr,node1=None,node2=None):
     print('The shortest path is: ' + ', '.join(short_path))
     print('The two ORCID IDs are connected by {} degree(s).'.format(len(short_path)-1))
 
-def find_coauthors_without_ORCID(path=curr,node=None):
+    return short_path
+
+def find_coauthors_without_ORCID(path=curr,node=None,orcid_data=None):
     """
     Given an input ORCID ID, find all of that author's coauthors who have not entered an ORCID ID.
 
@@ -199,7 +214,8 @@ def find_coauthors_without_ORCID(path=curr,node=None):
         print('Please enter an ORCID ID.')
         return
 
-    orcid_data = np.load(path + '/' + 'all_astro_orcid_papers.npy')
+    if orcid_data is None:
+        orcid_data = np.load(path + '/' + 'all_astro_orcid_papers.npy')
 
     # search data for papers authored by the given ORCID ID and find their coauthors who did not give an ORCID ID
     coauthors = set()
@@ -211,3 +227,5 @@ def find_coauthors_without_ORCID(path=curr,node=None):
 
     print('Coauthors missing ORCID IDs: ')
     print(sorted(coauthors))
+
+    return sorted(coauthors)
