@@ -36,6 +36,9 @@ def find_all_ORCID_papers_in_ADS(save=True,verbose=False):
         query += 1
         allpapers_lol.append(papers)
 
+        if verbose:
+            print("Query #" + str(query))
+
     allpapers = [item for sublist in allpapers_lol for item in sublist]
     if verbose:
         print(len(allpapers))
